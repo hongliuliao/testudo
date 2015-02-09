@@ -27,11 +27,11 @@ int FormatData::insert(std::string &key, std::string &value) {
         return -1;
     }
     size_t line_size = get_line_size();
-    char line[line_size];
-    bzero(line, line_size);
+    char line[line_size + 1];
+    bzero(line, line_size + 1);
 
     std::string line_format = get_line_format();
-    snprintf(line, line_size, line_format.c_str(), key.c_str(), value.c_str());
+    snprintf(line, line_size + 1, line_format.c_str(), key.c_str(), value.c_str());
 
     fs.seekp(0, fs.end);
     fs.write(line, line_size);
@@ -45,11 +45,11 @@ int FormatData::update(std::string &key, size_t line_index, std::string &value) 
         return -1;
     }
     size_t line_size = get_line_size();
-    char line[line_size];
-    bzero(line, line_size);
+    char line[line_size + 1];
+    bzero(line, line_size + 1);
 
     std::string line_format = get_line_format();
-    snprintf(line, line_size, line_format.c_str(), key.c_str(), value.c_str());
+    snprintf(line, line_size + 1, line_format.c_str(), key.c_str(), value.c_str());
 
     size_t offset = line_index * line_size;
     fs.seekp(offset, fs.beg);
@@ -147,7 +147,7 @@ int FormatData::get(size_t &line_index, std::string &value) {
 }
 
 size_t FormatData::get_line_size() {
-    return config.key_limit_size + SPLIT_SIZE + config.value_limit_size + ENDL_SIZE + 1;
+    return config.key_limit_size + SPLIT_SIZE + config.value_limit_size + ENDL_SIZE;
 }
 
 std::string FormatData::get_line_format() {
