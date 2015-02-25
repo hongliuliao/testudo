@@ -17,36 +17,66 @@ struct FormatDataConfig {
     std::string file_name;
     int key_limit_size;
     int value_limit_size;
+    int hash_size;
+};
+
+class FormatLine {
+public:
+    std::string key;
+    int _key_size;
+    std::string value;
+    int _value_size;
+    int status;
+    int32_t next_index;
+
+    const static int SPLIT_SIZE = 1;
+    const static int MAX_LINE_DIGIT = 9;
+    const static int ENDL_SIZE = 1;
+    const static int IS_DELETE_NODE = 1;
+
+    FormatLine(int key_size, int value_size);
+
+    int deserialize(char *input, int size);
+
+    int serialize(char *output, int size);
+
+    std::string get_format();
+
+    int get_line_size();
+
+    uint32_t get_key_hash();
+
+    bool is_delete();
+
+    bool key_equal(std::string &input);
 };
 
 class FormatData {
 private:
     FormatDataConfig config;
     std::fstream fs;
-    size_t write_index;
 
+    std::fstream ext_fs;
+    int ext_write_index;
+
+    int get_by_index(uint32_t &line_index, FormatLine &fline);
+
+    int get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode);
 public:
+    const static int GET_RET_OF_FAIL = -1;
+    const static int GET_RET_OF_NOFOUND = -2;
+    const static int GET_RET_OF_DELETED = -3;
+
     ~FormatData();
 
     int init(FormatDataConfig &_config);
 
-    int insert(std::string &key, std::string &value);
+    int put(std::string &key, std::string &value);
 
-    int update(std::string &key, size_t line_index, std::string &value);
-
-    int get(size_t &line_index, std::string &value);
+    int get(std::string &key, std::string &value);
 
     int del(std::string &key);
 
-    int load_data(std::map<std::string, std::string> &map);
-
-    size_t get_line_size();
-
-    std::string get_line_format();
-
-    size_t get_write_index();
-
-    size_t incr_write_index();
 };
 
 #endif /* FORMAT_DATA_H_ */

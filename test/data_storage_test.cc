@@ -16,10 +16,7 @@ int main() {
     config.data_config.file_name = "testdudo_test.data";
     config.data_config.key_limit_size = 10;
     config.data_config.value_limit_size = 100;
-
-    config.index_config.dir = "/tmp/";
-    config.index_config.file_name = "testdudo_test.index";
-    config.index_config.key_limit_size = 10;
+    config.data_config.hash_size = 10000;
 
     DataStorage storage;
     int ret = storage.init(config);
@@ -34,11 +31,11 @@ int main() {
 //    if (ret != 0) {
 //        return ret;
 //    }
-//
-//    std::string key2 = "222";
-//    std::string value2 = "jetty2";
-//    ret = storage.put(key2, value2);
 
+//    std::string key2 = "222";
+//    std::string value2 = "jetty3";
+//    ret = storage.put(key2, value2);
+//
 //    std::string value3;
 //    ret = storage.get(key2, value3);
 //    if (ret != 0) {
@@ -51,13 +48,16 @@ int main() {
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
-    for (size_t i = 0; i < 100000; i++) {
+    for (size_t i = 0; i < 10000; i++) {
         std::stringstream temp;
-        temp << i;
+        temp << "k_" << i;
         std::string key4 = temp.str();
         std::string value4 = "jetty6";
         ret = storage.put(key4, value4);
-//        ret = storage.get(key4, value4);
+        ret = storage.get(key4, value4);
+        if (ret != 0) {
+            LOG_ERROR("CAN NOT GET FOR KEY:%s, ret:%d", key4.c_str(), ret);
+        }
     }
 
     gettimeofday(&end, NULL);
