@@ -14,7 +14,7 @@ int main() {
     DataStorageConfig config;
     config.data_config.dir = "/tmp/";
     config.data_config.file_name = "testdudo_test.data";
-    config.data_config.key_limit_size = 10;
+    config.data_config.key_limit_size = 15;
     config.data_config.value_limit_size = 100;
     config.data_config.hash_size = 10000;
 
@@ -50,7 +50,7 @@ int main() {
 
     for (size_t i = 0; i < 10000; i++) {
         std::stringstream temp;
-        temp << "k_" << i;
+        temp << "k_" << rand();
         std::string key4 = temp.str();
         std::string value4 = "jetty6";
         ret = storage.put(key4, value4);

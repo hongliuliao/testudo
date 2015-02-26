@@ -177,6 +177,10 @@ int FormatData::init(FormatDataConfig &_config) {
 }
 
 int FormatData::put(std::string &key, std::string &value) {
+    if (key.size() > config.key_limit_size) {
+        LOG_ERROR("key SIZE REACH LIMIT which size:%d, limit:%d", key.size(), config.key_limit_size);
+        return -1;
+    }
     if (value.size() > config.value_limit_size) {
         LOG_ERROR("value SIZE REACH LIMIT which size:%d, limit:%d", value.size(), config.value_limit_size);
         return -1;
