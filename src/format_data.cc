@@ -67,14 +67,47 @@ int FormatLine::get_line_size() {
     return _key_size + SPLIT_SIZE + _value_size + SPLIT_SIZE + sizeof(char) + SPLIT_SIZE + MAX_LINE_DIGIT + ENDL_SIZE;
 }
 
+// MurmurHash2 from redis (dict.c)
 uint32_t FormatLine::get_key_hash() {
-    const char *buf = key.c_str();
     int len = key.size();
-    unsigned int hash = (unsigned int) dict_hash_function_seed;
+    uint32_t seed = dict_hash_function_seed;
+    const uint32_t m = 0x5bd1e995;
+    const int r = 24;
 
-    while (len--)
-        hash = ((hash << 5) + hash) + (tolower(*buf++)); /* hash * 33 + c */
-    return hash;
+    /* Initialize the hash to a 'random' value */
+    uint32_t h = seed ^ len;
+
+    /* Mix 4 bytes at a time into the hash */
+    const unsigned char *data = (const unsigned char *)key.c_str();
+
+    while(len >= 4) {
+        uint32_t k = *(uint32_t*)data;
+
+        k *= m;
+        k ^= k >> r;
+        k *= m;
+
+        h *= m;
+        h ^= k;
+
+        data += 4;
+        len -= 4;
+    }
+
+    /* Handle the last few bytes of the input array  */
+    switch(len) {
+    case 3: h ^= data[2] << 16;
+    case 2: h ^= data[1] << 8;
+    case 1: h ^= data[0]; h *= m;
+    };
+
+    /* Do a few final mixes of the hash to ensure the last few
+     * bytes are well-incorporated. */
+    h ^= h >> 13;
+    h *= m;
+    h ^= h >> 15;
+
+    return (unsigned int)h;
 }
 
 bool FormatLine::is_delete() {
@@ -184,6 +217,7 @@ int FormatData::put(std::string &key, std::string &value) {
 
     int32_t next_index = format_line.next_index;
     int32_t current_index = -1;
+    bool update_bucket = true;
     FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
     while (next_index != -1) {
         size_t ext_offset = next_index * line_size;
@@ -198,6 +232,7 @@ int FormatData::put(std::string &key, std::string &value) {
             ext_fs.write(line, line_size);
             return 0;
         }
+        update_bucket = false;
         current_index = next_index;
         next_index = ext_fnode.next_index;
     }
@@ -219,8 +254,9 @@ int FormatData::put(std::string &key, std::string &value) {
     ext_fs.write(new_ext_node_bytes, line_size);
 
     // 2. update old node
-    if (current_index == -1) { // 2.1 update hash bucket node
+    if (update_bucket) { // 2.1 update hash bucket node
         format_line.next_index = ext_write_index;
+        bzero(line, line_size);
         format_line.serialize(line, line_size);
         fs.seekp(offset);
         fs.write(line, line_size);
