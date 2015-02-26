@@ -33,7 +33,10 @@ int FormatLine::deserialize(char *buffer, int size) {
     char tmp_next_index[MAX_LINE_DIGIT];
     bzero(tmp_next_index, MAX_LINE_DIGIT);
 
-    sscanf(buffer, get_format().c_str(), tmp_key, tmp_value, tmp_status, tmp_next_index);
+    if (sscanf(buffer, get_format().c_str(), tmp_key, tmp_value, tmp_status, tmp_next_index) != 4) {
+        LOG_ERROR("deserialize FAIL which input :%s", buffer);
+        return -1;
+    }
 
     key.assign(tmp_key);
     value.assign(tmp_value);
@@ -265,7 +268,7 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     }
     ext_fs.write(new_ext_node_bytes, line_size);
 
-    // 2. update old node
+    // 2. update preposition node
     if (update_bucket) { // 2.1 update hash bucket node
         format_line.next_index = ext_write_index;
         bzero(line, line_size);
