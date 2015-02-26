@@ -9,7 +9,7 @@ objects := $(patsubst %.cc,%.o,$(wildcard src/*.cc))
 
 all: prepare $(objects) package
 	
-test: data_storage_test	
+test: data_storage_test	format_data_test
 
 prepare: 
 	mkdir -p bin/include bin/lib
@@ -26,6 +26,9 @@ package:
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 	
 data_storage_test: test/data_storage_test.cc
+	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
+
+format_data_test: test/format_data_test.cc
 	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
 
 clean:
