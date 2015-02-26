@@ -13,7 +13,7 @@
 int main() {
     DataStorageConfig config;
     config.data_config.dir = "/tmp/";
-    config.data_config.file_name = "testdudo_test.data";
+    config.data_config.file_name = "testudo_test.data";
     config.data_config.key_limit_size = 15;
     config.data_config.value_limit_size = 100;
     config.data_config.hash_size = 10000;
