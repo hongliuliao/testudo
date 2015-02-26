@@ -21,6 +21,3 @@ int DataStorage::get(std::string &key, std::string &value) {
     return format_data.get(key, value);
 }
 
-int DataStorage::del(std::string &key) {
-    return format_data.del(key);
-}

@@ -75,8 +75,6 @@ public:
 
     int get(std::string &key, std::string &value);
 
-    int del(std::string &key);
-
 };
 
 #endif /* FORMAT_DATA_H_ */
