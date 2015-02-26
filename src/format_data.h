@@ -71,7 +71,7 @@ public:
 
     int init(FormatDataConfig &_config);
 
-    int put(std::string &key, std::string &value);
+    int update(std::string &key, std::string &value, bool is_delete);
 
     int get(std::string &key, std::string &value);
 

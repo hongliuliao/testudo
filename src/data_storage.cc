@@ -14,10 +14,14 @@ int DataStorage::init(DataStorageConfig storage_config) {
 }
 
 int DataStorage::put(std::string &key, std::string &value) {
-    return this->format_data.put(key, value);
+    return this->format_data.update(key, value, false);
 }
 
 int DataStorage::get(std::string &key, std::string &value) {
     return format_data.get(key, value);
 }
 
+int DataStorage::del(std::string &key) {
+    std::string value;
+    return format_data.update(key, value, true);
+}

@@ -54,10 +54,11 @@ int main() {
         std::string key4 = temp.str();
         std::string value4 = "jetty6";
         ret = storage.put(key4, value4);
-//        ret = storage.get(key4, value4);
-//        if (ret != 0) {
-//            LOG_ERROR("CAN NOT GET FOR KEY:%s, ret:%d", key4.c_str(), ret);
-//        }
+//        storage.del(key4);
+        ret = storage.get(key4, value4);
+        if (ret != 0) {
+            LOG_ERROR("CAN NOT GET FOR KEY:%s, ret:%d", key4.c_str(), ret);
+        }
     }
 
     gettimeofday(&end, NULL);

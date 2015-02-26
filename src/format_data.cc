@@ -176,7 +176,7 @@ int FormatData::init(FormatDataConfig &_config) {
     return 0;
 }
 
-int FormatData::put(std::string &key, std::string &value) {
+int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     if (key.size() > config.key_limit_size) {
         LOG_ERROR("key SIZE REACH LIMIT which size:%d, limit:%d", key.size(), config.key_limit_size);
         return -1;
@@ -212,7 +212,11 @@ int FormatData::put(std::string &key, std::string &value) {
     }
 
     if (format_line.key_equal(key)) { // update
-        format_line.value = value;
+        if (!is_delete) {
+            format_line.value = value;
+        } else {
+            format_line.status = FormatLine::IS_DELETE_NODE;
+        }
         format_line.serialize(line, line_size);
         fs.seekp(offset);
         fs.write(line, line_size);
@@ -230,7 +234,11 @@ int FormatData::put(std::string &key, std::string &value) {
             return ret;
         }
         if (ext_fnode.key_equal(key)) {
-            ext_fnode.value = value;
+            if (!is_delete) {
+                ext_fnode.value = value;
+            } else {
+                ext_fnode.status = FormatLine::IS_DELETE_NODE;
+            }
             ext_fnode.serialize(line, line_size);
             ext_fs.seekp(ext_offset);
             ext_fs.write(line, line_size);
