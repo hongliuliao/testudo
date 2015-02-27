@@ -205,31 +205,29 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
         return -1;
     }
 
-    FormatLine update_node(config.key_limit_size, config.value_limit_size);
-    update_node.key = key;
-    update_node.value = value;
+    FormatLine bucket_node(config.key_limit_size, config.value_limit_size);
+    bucket_node.key = key;
+    bucket_node.value = value;
 
-    uint32_t hash = update_node.get_key_hash();
+    uint32_t hash = bucket_node.get_key_hash();
     uint32_t line_index = hash % config.hash_size;
 
-    int ret = this->get_by_index(line_index, update_node);
+    int ret = this->get_by_index(line_index, bucket_node);
     if (ret == GET_RET_OF_FAIL) {
         return ret;
     }
 
     if (ret == GET_RET_OF_NOFOUND) {
-        update_node.write_to(fs, line_index);
-        return 0;
+        return bucket_node.write_to(fs, line_index);
     }
 
-    if (update_node.key_equal(key)) { // update
+    if (bucket_node.key_equal(key)) { // update
         if (!is_delete) {
-            update_node.value = value;
+            bucket_node.value = value;
         } else {
-            update_node.status = FormatLine::IS_DELETE_NODE;
+            bucket_node.status = FormatLine::IS_DELETE_NODE;
         }
-        update_node.write_to(fs, line_index);
-        return 0;
+        return bucket_node.write_to(fs, line_index);
     }
 
     int32_t current_index = -1;
@@ -237,7 +235,7 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
 
     // FIND INSERT OR UPDATE POSTION
-    int32_t next_index = update_node.next_index;
+    int32_t next_index = bucket_node.next_index;
     while (next_index != -1) {
         int ret = get_next_ext_nodex(next_index, ext_fnode);
         if (ret != 0) {
@@ -261,19 +259,22 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     FormatLine new_ext_fnode(config.key_limit_size, config.value_limit_size);
     new_ext_fnode.key = key;
     new_ext_fnode.value = value;
-    new_ext_fnode.write_to(ext_fs, ext_write_index);
+    ret = new_ext_fnode.write_to(ext_fs, ext_write_index);
+    if (ret != 0) {
+        return ret;
+    }
 
     // 2. update preposition node
     if (update_bucket) { // 2.1 update hash bucket node
-        update_node.next_index = ext_write_index;
-        update_node.write_to(fs, line_index);
+        bucket_node.next_index = ext_write_index;
+        ret = bucket_node.write_to(fs, line_index);
     } else {             // 2.2 update hash data node
         ext_fnode.next_index = ext_write_index;
-        ext_fnode.write_to(ext_fs, current_index);
+        ret = ext_fnode.write_to(ext_fs, current_index);
     }
     ext_write_index++;
 
-    return 0;
+    return ret;
 }
 
 int FormatData::get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode) {
