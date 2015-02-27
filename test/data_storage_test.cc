@@ -25,12 +25,12 @@ int main() {
         return ret;
     }
 //
-    std::string key = "111";
-    std::string value = "tom1";
-    ret = storage.put(key, value);
-    if (ret != 0) {
-        return ret;
-    }
+//    std::string key = "111";
+//    std::string value = "tom1";
+//    ret = storage.put(key, value);
+//    if (ret != 0) {
+//        return ret;
+//    }
 
 //    std::string key2 = "222";
 //    std::string value2 = "jetty3";
@@ -45,25 +45,25 @@ int main() {
 //        LOG_INFO("FOUND FOR key2:%s, value:%s", key2.c_str(), value3.c_str());
 //    }
 
-//    struct timeval start, end;
-//    gettimeofday(&start, NULL);
-//
-//    for (size_t i = 0; i < 100000; i++) {
-//        std::stringstream temp;
-//        temp << "k_" << rand();
-//        std::string key4 = temp.str();
-//        std::string value4 = "jetty6";
-//        ret = storage.put(key4, value4);
-//        storage.del(key4);
-        //ret = storage.get(key4, value4);
-//        if (ret != 0) {
-//            LOG_ERROR("CAN NOT GET FOR KEY:%s, ret:%d", key4.c_str(), ret);
-//        }
-//    }
-//
-//    gettimeofday(&end, NULL);
-//    int cost_time = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
-//    std::cout << "cost_time:" << cost_time << "ms" << std::endl;
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+
+    for (size_t i = 0; i < 100000; i++) {
+        std::stringstream temp;
+        temp << "k_" << rand();
+        std::string key4 = temp.str();
+        std::string value4 = "jetty6";
+        ret = storage.put(key4, value4);
+        //storage.del(key4);
+        ret = storage.get(key4, value4);
+        if (ret != 0) {
+            LOG_ERROR("CAN NOT GET FOR KEY:%s, ret:%d", key4.c_str(), ret);
+        }
+    }
+
+    gettimeofday(&end, NULL);
+    int cost_time = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
+    std::cout << "cost_time:" << cost_time << "ms" << std::endl;
 
     return ret;
 }

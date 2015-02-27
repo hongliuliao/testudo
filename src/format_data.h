@@ -40,6 +40,8 @@ public:
 
     int serialize(char *output, int size);
 
+    int write_to(std::fstream &fs, uint32_t line_index);
+
     std::string get_format();
 
     int get_line_size();

@@ -122,6 +122,22 @@ bool FormatLine::key_equal(std::string &input) {
     return input == key;
 }
 
+int FormatLine::write_to(std::fstream &fs, uint32_t line_index) {
+    size_t line_size = this->get_line_size();
+    char line[line_size];
+    bzero(line, line_size);
+    this->serialize(line, line_size);
+
+    size_t offset = line_index * line_size;
+    fs.seekp(offset);
+    fs.write(line, line_size);
+    if (!fs || !fs.good()) {
+        LOG_ERROR("fs not valid after write which offset:%u", offset);
+        return -1;
+    }
+    return 0;
+}
+
 FormatData::~FormatData() {
     if (fs) {
         fs.close();
@@ -189,49 +205,40 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
         return -1;
     }
 
-    FormatLine format_line(config.key_limit_size, config.value_limit_size);
-    format_line.key = key;
-    format_line.value = value;
+    FormatLine update_node(config.key_limit_size, config.value_limit_size);
+    update_node.key = key;
+    update_node.value = value;
 
-    size_t line_size = format_line.get_line_size();
-    char line[line_size];
-    bzero(line, line_size);
-
-    uint32_t hash = format_line.get_key_hash();
+    uint32_t hash = update_node.get_key_hash();
     uint32_t line_index = hash % config.hash_size;
-    size_t offset = line_index * line_size;
 
-    int ret = this->get_by_index(line_index, format_line);
+    int ret = this->get_by_index(line_index, update_node);
     if (ret == GET_RET_OF_FAIL) {
         return ret;
     }
 
     if (ret == GET_RET_OF_NOFOUND) {
-        format_line.serialize(line, line_size);
-        LOG_DEBUG("NOT FOUND FOR KEY:%s, insert line:%s, hash:%u, line_index:%u, offset:%u, line_size:%u", key.c_str(), line, hash, line_index, offset, line_size);
-        fs.seekp(offset);
-        fs.write(line, line_size);
+        update_node.write_to(fs, line_index);
         return 0;
     }
 
-    if (format_line.key_equal(key)) { // update
+    if (update_node.key_equal(key)) { // update
         if (!is_delete) {
-            format_line.value = value;
+            update_node.value = value;
         } else {
-            format_line.status = FormatLine::IS_DELETE_NODE;
+            update_node.status = FormatLine::IS_DELETE_NODE;
         }
-        format_line.serialize(line, line_size);
-        fs.seekp(offset);
-        fs.write(line, line_size);
+        update_node.write_to(fs, line_index);
         return 0;
     }
 
-    int32_t next_index = format_line.next_index;
     int32_t current_index = -1;
     bool update_bucket = true;
     FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
+
+    // FIND INSERT OR UPDATE POSTION
+    int32_t next_index = update_node.next_index;
     while (next_index != -1) {
-        size_t ext_offset = next_index * line_size;
         int ret = get_next_ext_nodex(next_index, ext_fnode);
         if (ret != 0) {
             return ret;
@@ -242,10 +249,7 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
             } else {
                 ext_fnode.status = FormatLine::IS_DELETE_NODE;
             }
-            ext_fnode.serialize(line, line_size);
-            ext_fs.seekp(ext_offset);
-            ext_fs.write(line, line_size);
-            return 0;
+            return ext_fnode.write_to(ext_fs, next_index);
         }
         update_bucket = false;
         current_index = next_index;
@@ -254,33 +258,18 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
 
     // write for data file
     // 1. insert new node
-    size_t new_pos = ext_write_index * line_size;
     FormatLine new_ext_fnode(config.key_limit_size, config.value_limit_size);
     new_ext_fnode.key = key;
     new_ext_fnode.value = value;
-    char new_ext_node_bytes[line_size];
-    bzero(new_ext_node_bytes, line_size);
-    new_ext_fnode.serialize(new_ext_node_bytes, line_size);
-    ext_fs.seekp(new_pos);
-    if (!ext_fs) {
-//        LOG_ERROR("EXT FS not valid after seekp! which new_pos:%u", new_pos);
-        return -1;
-    }
-    ext_fs.write(new_ext_node_bytes, line_size);
+    new_ext_fnode.write_to(ext_fs, ext_write_index);
 
     // 2. update preposition node
     if (update_bucket) { // 2.1 update hash bucket node
-        format_line.next_index = ext_write_index;
-        bzero(line, line_size);
-        format_line.serialize(line, line_size);
-        fs.seekp(offset);
-        fs.write(line, line_size);
-    } else {                   // 2.2 update hash data node
+        update_node.next_index = ext_write_index;
+        update_node.write_to(fs, line_index);
+    } else {             // 2.2 update hash data node
         ext_fnode.next_index = ext_write_index;
-        ext_fnode.serialize(line, line_size);
-        size_t update_node_offset = current_index * line_size;
-        ext_fs.seekp(update_node_offset);
-        ext_fs.write(line, line_size);
+        ext_fnode.write_to(ext_fs, current_index);
     }
     ext_write_index++;
 
