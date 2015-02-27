@@ -18,7 +18,7 @@ int main() {
     config.data_config.file_name = "testudo_test.data";
     config.data_config.key_limit_size = 15;
     config.data_config.value_limit_size = 100;
-    config.data_config.hash_size = 100000;
+    config.data_config.hash_size = hash_size;
 
     DataStorage storage;
     int ret = storage.init(config);
@@ -51,7 +51,7 @@ int main() {
     gettimeofday(&start, NULL);
 
     int put_size = 100000;
-    for (size_t i = 0; i < 100000; i++) {
+    for (size_t i = 0; i < put_size; i++) {
         std::stringstream temp;
         temp << "k_" << rand();
         std::string key4 = temp.str();
