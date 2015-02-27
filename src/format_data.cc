@@ -71,7 +71,7 @@ int FormatLine::get_line_size() {
 }
 
 // MurmurHash2 from redis (dict.c)
-uint32_t FormatLine::get_key_hash() {
+uint32_t get_key_hash(std::string &key) {
     int len = key.size();
     uint32_t seed = dict_hash_function_seed;
     const uint32_t m = 0x5bd1e995;
@@ -205,19 +205,18 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
         return -1;
     }
 
-    FormatLine bucket_node(config.key_limit_size, config.value_limit_size);
-    bucket_node.key = key;
-    bucket_node.value = value;
-
-    uint32_t hash = bucket_node.get_key_hash();
+    uint32_t hash = get_key_hash(key);
     uint32_t line_index = hash % config.hash_size;
 
+    FormatLine bucket_node(config.key_limit_size, config.value_limit_size);
     int ret = this->get_by_index(line_index, bucket_node);
     if (ret == GET_RET_OF_FAIL) {
         return ret;
     }
 
     if (ret == GET_RET_OF_NOFOUND) {
+        bucket_node.key = key;
+        bucket_node.value = value;
         return bucket_node.write_to(fs, line_index);
     }
 
@@ -295,7 +294,7 @@ int FormatData::get(std::string &key, std::string &value) {
     FormatLine format_line(config.key_limit_size, config.value_limit_size);
     format_line.key = key;
     int line_size = format_line.get_line_size();
-    uint32_t hash = format_line.get_key_hash();
+    uint32_t hash = get_key_hash(key);
     uint32_t line_index = hash % config.hash_size;
 
     LOG_DEBUG("GET FOR KEY:%s, hash:%u, line_index:%u", key.c_str(), hash, line_index);

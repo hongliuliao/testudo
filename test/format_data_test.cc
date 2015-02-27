@@ -17,7 +17,7 @@ int main() {
         std::stringstream temp;
         temp << "k_" << i;
         fline.key = temp.str();
-        uint32_t hash = fline.get_key_hash() % 100000;
+        uint32_t hash = get_key_hash(fline.key) % 100000;
         if (key_map.find(hash) == key_map.end()) {
             key_map[hash] = true;
         }

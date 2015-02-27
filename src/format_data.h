@@ -20,6 +20,8 @@ struct FormatDataConfig {
     int hash_size;
 };
 
+uint32_t get_key_hash(std::string &key);
+
 class FormatLine {
 public:
     std::string key;
