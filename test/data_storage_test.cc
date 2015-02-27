@@ -11,6 +11,8 @@
 #include "simple_log.h"
 
 int main() {
+    int hash_size = 100000;
+
     DataStorageConfig config;
     config.data_config.dir = "/tmp/";
     config.data_config.file_name = "testudo_test.data";
@@ -48,6 +50,7 @@ int main() {
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
+    int put_size = 100000;
     for (size_t i = 0; i < 100000; i++) {
         std::stringstream temp;
         temp << "k_" << rand();
@@ -63,7 +66,7 @@ int main() {
 
     gettimeofday(&end, NULL);
     int cost_time = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
-    std::cout << "cost_time:" << cost_time << "ms" << std::endl;
+    LOG_INFO("####### TESTUDO hash_size:%d, put_size:%d, cost_time:%d ms #######", hash_size, put_size, cost_time);
 
     return ret;
 }
