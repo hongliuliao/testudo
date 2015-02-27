@@ -48,8 +48,6 @@ public:
 
     int get_line_size();
 
-    uint32_t get_key_hash();
-
     bool is_delete();
 
     bool key_equal(std::string &input);
