@@ -298,8 +298,7 @@ int FormatData::get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode) {
         LOG_ERROR("EXT FS not valid after read! which next_index:%d", next_index);
         return -1;
     }
-    ext_fnode.deserialize(ext_node, line_size);
-    return 0;
+    return ext_fnode.deserialize(ext_node, line_size);
 }
 
 int FormatData::get(std::string &key, std::string &value) {
