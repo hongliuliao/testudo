@@ -239,6 +239,7 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     if (ret == GET_RET_OF_NOFOUND) {
         bucket_node._key = key;
         bucket_node.value = value;
+        bucket_node.status = 0;
         return bucket_node.write_to(fs, line_index);
     }
 
