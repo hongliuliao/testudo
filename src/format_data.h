@@ -24,7 +24,7 @@ uint32_t get_key_hash(std::string &key);
 
 class FormatLine {
 public:
-    std::string key;
+    std::string _key;
     int _key_size;
     std::string value;
     int _value_size;
@@ -35,6 +35,7 @@ public:
     const static int MAX_LINE_DIGIT = 9;
     const static int ENDL_SIZE = 1;
     const static int IS_DELETE_NODE = 1;
+    const static int IS_EMPTY_NODE = 2;
 
     FormatLine(int key_size, int value_size);
 
@@ -49,6 +50,8 @@ public:
     int get_line_size();
 
     bool is_delete();
+
+    bool is_empty();
 
     bool key_equal(std::string &input);
 };

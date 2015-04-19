@@ -50,7 +50,7 @@ int main() {
     struct timeval start, end;
     gettimeofday(&start, NULL);
 
-    int put_size = 100000;
+    size_t put_size = 100000;
     for (size_t i = 0; i < put_size; i++) {
         std::stringstream temp;
         temp << "k_" << rand();

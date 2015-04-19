@@ -24,22 +24,20 @@ FormatLine::FormatLine(int key_size, int value_size) {
 }
 
 int FormatLine::deserialize(char *buffer, int size) {
-    char tmp_key[_key_size];
-    bzero(tmp_key, _key_size);
-    char tmp_value[_value_size];
-    bzero(tmp_value, _value_size);
-    char tmp_status[1];
-    bzero(tmp_status, 1);
+    char tmp_status[2];
+    bzero(tmp_status, 2);
     char tmp_next_index[MAX_LINE_DIGIT];
     bzero(tmp_next_index, MAX_LINE_DIGIT);
 
-    if (sscanf(buffer, get_format().c_str(), tmp_key, tmp_value, tmp_status, tmp_next_index) != 4) {
-        LOG_ERROR("deserialize FAIL which input :%s", buffer);
-        return -1;
-    }
+    const char *p = buffer;
+    _key.assign(p, _key_size);
+    const char *v_s = buffer + _key_size + 1;
+    value.assign(v_s, _value_size);
+    tmp_status[0] = *(buffer + _key_size + 1 + _value_size + 1);
 
-    key.assign(tmp_key);
-    value.assign(tmp_value);
+    const char *n_s = buffer + _key_size + 1 + _value_size + 1 + 2;
+    strncpy(tmp_next_index, n_s, MAX_LINE_DIGIT);
+
     status = atoi(tmp_status);
     next_index = atoi(tmp_next_index);
     return 0;
@@ -54,7 +52,7 @@ int FormatLine::serialize(char *result, int size) {
     status_ss << status;
     std::stringstream next_index_ss;
     next_index_ss << next_index;
-    snprintf(line, size + 1, line_format.c_str(), key.c_str(), value.c_str(), status_ss.str().c_str(), next_index_ss.str().c_str());
+    snprintf(line, size + 1, line_format.c_str(), _key.c_str(), value.c_str(), status_ss.str().c_str(), next_index_ss.str().c_str());
     memcpy(result, line, size);
     return 0;
 }
@@ -68,6 +66,10 @@ std::string FormatLine::get_format() {
 
 int FormatLine::get_line_size() {
     return _key_size + SPLIT_SIZE + _value_size + SPLIT_SIZE + sizeof(char) + SPLIT_SIZE + MAX_LINE_DIGIT + ENDL_SIZE;
+}
+
+bool FormatLine::is_empty() {
+    return status == IS_EMPTY_NODE;
 }
 
 // MurmurHash2 from redis (dict.c)
@@ -118,8 +120,15 @@ bool FormatLine::is_delete() {
 }
 
 bool FormatLine::key_equal(std::string &input) {
-//    LOG_DEBUG("GET KEY which input:%s, actual:%s", input.c_str(), key.c_str());
-    return input == key;
+    std::stringstream key_format;
+    key_format << "%" << _key_size << "s";
+    char key[_key_size + 1];
+    bzero(key, _key_size + 1);
+    snprintf(key, _key_size + 1, key_format.str().c_str(), input.c_str());
+    
+    //LOG_DEBUG("GET KEY which input:%s, actual:%s", key, _key.c_str());
+    //LOG_DEBUG("GET KEY which input size:%d, actual size:%d, _key_size:%d", strlen(key), _key.size(), _key_size);
+    return strcmp(key, _key.c_str()) == 0;
 }
 
 int FormatLine::write_to(std::fstream &fs, uint32_t line_index) {
@@ -151,36 +160,49 @@ FormatData::~FormatData() {
 int FormatData::init(FormatDataConfig &_config) {
     config = _config;
     std::string file_path = config.dir + config.file_name;
-    fs.open(file_path.c_str(), std::fstream::out | std::fstream::in);
+
+    std::fstream check_fs;
+    check_fs.open(file_path.c_str(), std::fstream::out | std::fstream::in);
     FormatLine fline(config.key_limit_size, config.value_limit_size);
-    if (!fs) {
+    if (!check_fs) {
         LOG_INFO("FILE NOT FOUND WE WILL create it:%s", file_path.c_str());
         size_t file_size = config.hash_size * fline.get_line_size();
+
         std::ofstream create_fs(file_path.c_str());
-        create_fs.seekp(file_size);
-        create_fs.write("\n", 1);
-        create_fs.close();
+        char empty[fline.get_line_size()];
+        bzero(empty, fline.get_line_size());
 
-        fs.open(file_path.c_str(), std::fstream::out | std::fstream::in);
-        if (!fs) {
-            LOG_ERROR("open file error for path:%s", file_path.c_str());
-            return -1;
+        fline._key = "";
+        fline.value = "";
+        fline.status = FormatLine::IS_EMPTY_NODE;
+        fline.next_index = -1;
+        fline.serialize(empty, fline.get_line_size());
+
+        for (size_t i = 0; i < config.hash_size; i++) {
+            create_fs.write(empty, fline.get_line_size());
         }
+        create_fs.close();
+    }
 
+    fs.open(file_path.c_str(), std::fstream::out | std::fstream::in);
+    if (!fs) {
+        LOG_ERROR("open file error for path:%s", file_path.c_str());
+        return -1;
     }
 
     std::string ext_file_path = config.dir + config.file_name + ".ext";
-    ext_fs.open(ext_file_path.c_str(), std::fstream::out | std::fstream::in);
-    if (!ext_fs) {
+    std::fstream check_fs2;
+    check_fs2.open(ext_file_path.c_str(), std::fstream::out | std::fstream::in);
+    if (!check_fs2) {
         LOG_INFO("FILE NOT FOUND WE WILL create it:%s", ext_file_path.c_str());
         std::ofstream create_fs(ext_file_path.c_str(), std::fstream::app);
         create_fs.close();
 
-        ext_fs.open(ext_file_path.c_str(), std::fstream::out | std::fstream::in);
-        if (!ext_fs) {
-            LOG_ERROR("ext_fs open fail in init! which path:%s", ext_file_path.c_str());
-            return -1;
-        }
+    }
+    ext_fs.open(ext_file_path.c_str(), std::fstream::out | std::fstream::in);
+    if (!ext_fs) {
+        LOG_ERROR("ext_fs open fail in init! which path:%s", ext_file_path.c_str());
+        return -1;
     }
 
     this->config.key_limit_size = config.key_limit_size;
@@ -215,7 +237,7 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     }
 
     if (ret == GET_RET_OF_NOFOUND) {
-        bucket_node.key = key;
+        bucket_node._key = key;
         bucket_node.value = value;
         return bucket_node.write_to(fs, line_index);
     }
@@ -256,7 +278,7 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     // write for data file
     // 1. insert new node
     FormatLine new_ext_fnode(config.key_limit_size, config.value_limit_size);
-    new_ext_fnode.key = key;
+    new_ext_fnode._key = key;
     new_ext_fnode.value = value;
     ret = new_ext_fnode.write_to(ext_fs, ext_write_index);
     if (ret != 0) {
@@ -290,9 +312,25 @@ int FormatData::get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode) {
     return ext_fnode.deserialize(ext_node, line_size);
 }
 
+static inline std::string &ltrim(std::string &s) {
+        s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+        return s;
+}
+
+// trim from end
+static inline std::string &rtrim(std::string &s) {
+        s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+        return s;
+}
+
+// trim from both ends
+static inline std::string &trim(std::string &s) {
+        return ltrim(rtrim(s));
+}
+
 int FormatData::get(std::string &key, std::string &value) {
     FormatLine format_line(config.key_limit_size, config.value_limit_size);
-    format_line.key = key;
+    format_line._key = key;
     int line_size = format_line.get_line_size();
     uint32_t hash = get_key_hash(key);
     uint32_t line_index = hash % config.hash_size;
@@ -304,7 +342,7 @@ int FormatData::get(std::string &key, std::string &value) {
     }
 
     if (format_line.key_equal(key)) {
-        value = format_line.value;
+        value = trim(format_line.value);
         return 0;
     }
     int32_t next_index = format_line.next_index;
@@ -315,7 +353,7 @@ int FormatData::get(std::string &key, std::string &value) {
             return ret;
         }
         if (ext_fnode.key_equal(key)) {
-            value = ext_fnode.value;
+            value = trim(ext_fnode.value);
             return 0;
         }
         next_index = ext_fnode.next_index;
@@ -350,11 +388,6 @@ int FormatData::get_by_index(uint32_t &line_index, FormatLine &fline) {
         return -1;
     }
     fs.seekg(0, fs.end);
-    char empty_key[fline._key_size];
-    bzero(empty_key, fline._key_size);
-    if (memcmp(line, empty_key, fline._key_size) == 0) {
-        return GET_RET_OF_NOFOUND;
-    }
 
     LOG_DEBUG("READ LINE : %s FOR LINE INDE:%u, offset:%u", line, line_index, offset);
 
@@ -363,7 +396,9 @@ int FormatData::get_by_index(uint32_t &line_index, FormatLine &fline) {
         LOG_ERROR("FLINE deserialize fail for line:%s", line);
         return ret;
     }
-
+    if (fline.is_empty()) {
+        return GET_RET_OF_NOFOUND;
+    }
     if (fline.is_delete()) {
         LOG_DEBUG("fline is delete");
         return GET_RET_OF_DELETED;

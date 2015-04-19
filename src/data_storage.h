@@ -22,6 +22,11 @@ public:
 
     int put(std::string &key, std::string &value);
 
+    /**
+     * GET_RET_OF_FAIL == -1
+     * GET_RET_OF_NOFOUND = -2;
+     * GET_RET_OF_DELETED = -3;
+     */
     int get(std::string &key, std::string &value);
 
     int del(std::string &key);
