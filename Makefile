@@ -1,7 +1,7 @@
 CXX=g++
 CXXFLAGS += -g -I. -I dependency/simple_log/include -I src
 
-.PHONY : all test clean
+.PHONY : all test clean tags
 
 TEST_DEPS_LIBS = bin/lib/libtestudo.a dependency/simple_log/lib/libsimplelog.a 
 
@@ -15,7 +15,7 @@ prepare:
 	mkdir -p bin/include bin/lib
 	
 package:
-	mv src/*.o bin/
+	cp src/*.o bin/
 	ar -rcs libtestudo.a bin/*.o
 	
 	cp src/*.h bin/include/
@@ -31,7 +31,11 @@ data_storage_test: test/data_storage_test.cc
 format_data_test: test/format_data_test.cc
 	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
 
+tags:
+	ctags -R src
+
 clean:
+	rm -rf src/*.o
 	rm -rf bin/*
 
 	

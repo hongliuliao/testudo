@@ -16,11 +16,16 @@ const static int SPLIT_SIZE = 1;
 const static int ENDL_SIZE = 1;
 static uint32_t dict_hash_function_seed = 5381;
 
+FormatDataConfig::FormatDataConfig() {
+    expire_seconds = -1;
+}
+
 FormatLine::FormatLine(int key_size, int value_size) {
     _key_size = key_size;
     _value_size = value_size;
     status = 0;
     next_index = -1;
+    expired_time = 0;
 }
 
 int FormatLine::deserialize(char *buffer, int size) {
@@ -28,6 +33,8 @@ int FormatLine::deserialize(char *buffer, int size) {
     bzero(tmp_status, 2);
     char tmp_next_index[MAX_LINE_DIGIT];
     bzero(tmp_next_index, MAX_LINE_DIGIT);
+    char tmp_expried_time[MAX_TIME_LEN];
+    bzero(tmp_expried_time, MAX_LINE_DIGIT);
 
     const char *p = buffer;
     _key.assign(p, _key_size);
@@ -38,8 +45,12 @@ int FormatLine::deserialize(char *buffer, int size) {
     const char *n_s = buffer + _key_size + 1 + _value_size + 1 + 2;
     strncpy(tmp_next_index, n_s, MAX_LINE_DIGIT);
 
+    const char *t_s = n_s + MAX_LINE_DIGIT + 1; 
+    strncpy(tmp_expried_time, t_s, MAX_TIME_LEN);
+
     status = atoi(tmp_status);
     next_index = atoi(tmp_next_index);
+    expired_time = atoi(tmp_expried_time);
     return 0;
 }
 
@@ -52,20 +63,34 @@ int FormatLine::serialize(char *result, int size) {
     status_ss << status;
     std::stringstream next_index_ss;
     next_index_ss << next_index;
-    snprintf(line, size + 1, line_format.c_str(), _key.c_str(), value.c_str(), status_ss.str().c_str(), next_index_ss.str().c_str());
-    memcpy(result, line, size);
+    std::stringstream time_ss;
+    time_ss << expired_time;
+
+    snprintf(result, size + 1, line_format.c_str(), 
+        _key.c_str(), value.c_str(), 
+        status_ss.str().c_str(), next_index_ss.str().c_str(),
+        time_ss.str().c_str());
+    //memcpy(result, line, size);
     return 0;
 }
 
 // key \t value \t status \t next_index \n
 std::string FormatLine::get_format() {
     std::stringstream line_format;
-    line_format << "%" << _key_size << "s\t%" << _value_size << "s\t%1s\t%" << MAX_LINE_DIGIT << "s\n";
+    line_format << "%" << _key_size << "s\t%"
+        << _value_size << "s\t%1s\t%" << MAX_LINE_DIGIT << "s" 
+        << "\t" "%" << MAX_TIME_LEN << "s" 
+        << "\n";
     return line_format.str();
 };
 
 int FormatLine::get_line_size() {
-    return _key_size + SPLIT_SIZE + _value_size + SPLIT_SIZE + sizeof(char) + SPLIT_SIZE + MAX_LINE_DIGIT + ENDL_SIZE;
+    return _key_size + SPLIT_SIZE + 
+        _value_size + SPLIT_SIZE + 
+        sizeof(char) + SPLIT_SIZE + 
+        MAX_LINE_DIGIT + SPLIT_SIZE +
+        MAX_TIME_LEN +
+        ENDL_SIZE;
 }
 
 bool FormatLine::is_empty() {
@@ -115,7 +140,7 @@ uint32_t get_key_hash(std::string &key) {
     return (unsigned int)h;
 }
 
-bool FormatLine::is_delete() {
+bool FormatLine::is_deleted() {
     return status == IS_DELETE_NODE;
 }
 
@@ -217,7 +242,7 @@ int FormatData::init(FormatDataConfig &_config) {
     return 0;
 }
 
-int FormatData::update(std::string &key, std::string &value, bool is_delete) {
+int FormatData::update(std::string &key, std::string &value) {
     if (key.size() > config.key_limit_size) {
         LOG_ERROR("key SIZE REACH LIMIT which size:%d, limit:%d", key.size(), config.key_limit_size);
         return -1;
@@ -230,26 +255,42 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     uint32_t hash = get_key_hash(key);
     uint32_t line_index = hash % config.hash_size;
 
-    FormatLine bucket_node(config.key_limit_size, config.value_limit_size);
-    int ret = this->get_by_index(line_index, bucket_node);
-    if (ret == GET_RET_OF_FAIL) {
+    FormatLine exist_bucket_node(config.key_limit_size, config.value_limit_size);
+    int ret = this->get_main_index(line_index, exist_bucket_node);
+    if (ret == RET_OF_FAIL) {
         return ret;
     }
-
-    if (ret == GET_RET_OF_NOFOUND) {
-        bucket_node._key = key;
-        bucket_node.value = value;
-        bucket_node.status = 0;
-        return bucket_node.write_to(fs, line_index);
+    time_t expired_time = -1;
+    if (config.expire_seconds > 0) {
+        expired_time = time(NULL) + config.expire_seconds;
     }
 
-    if (bucket_node.key_equal(key)) { // update
-        if (!is_delete) {
-            bucket_node.value = value;
-        } else {
-            bucket_node.status = FormatLine::IS_DELETE_NODE;
+    if (ret == RET_OF_NOFOUND) {
+        FormatLine new_bucket_node(config.key_limit_size, config.value_limit_size);
+        new_bucket_node._key = key;
+        new_bucket_node.value = value;
+        new_bucket_node.status = 0;
+        if (config.expire_seconds > 0) {
+            new_bucket_node.expired_time = expired_time;
         }
-        return bucket_node.write_to(fs, line_index);
+        return new_bucket_node.write_to(fs, line_index);
+    }
+    if (ret == RET_OF_DELETED || ret == RET_OF_EXPIRED) {
+        exist_bucket_node._key = key; 
+        exist_bucket_node.value = value; 
+        exist_bucket_node.status = 0; 
+        if (config.expire_seconds > 0) {
+            exist_bucket_node.expired_time = expired_time;
+        }
+        return exist_bucket_node.write_to(fs, line_index);
+    }
+
+    if (exist_bucket_node.key_equal(key)) { // update
+        if (config.expire_seconds > 0) {
+            exist_bucket_node.expired_time = expired_time;
+        }
+        exist_bucket_node.value = value;
+        return exist_bucket_node.write_to(fs, line_index);
     }
 
     int32_t current_index = -1;
@@ -257,17 +298,16 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
 
     // FIND INSERT OR UPDATE POSTION
-    int32_t next_index = bucket_node.next_index;
+    int32_t next_index = exist_bucket_node.next_index;
     while (next_index != -1) {
         int ret = get_next_ext_nodex(next_index, ext_fnode);
-        if (ret != 0) {
+        if (ret == RET_OF_FAIL) {
             return ret;
         }
         if (ext_fnode.key_equal(key)) {
-            if (!is_delete) {
-                ext_fnode.value = value;
-            } else {
-                ext_fnode.status = FormatLine::IS_DELETE_NODE;
+            ext_fnode.value = value;
+            if (config.expire_seconds > 0) {
+                ext_fnode.expired_time = expired_time;
             }
             return ext_fnode.write_to(ext_fs, next_index);
         }
@@ -281,6 +321,9 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
     FormatLine new_ext_fnode(config.key_limit_size, config.value_limit_size);
     new_ext_fnode._key = key;
     new_ext_fnode.value = value;
+    if (config.expire_seconds > 0) {
+        new_ext_fnode.expired_time = expired_time;
+    }
     ret = new_ext_fnode.write_to(ext_fs, ext_write_index);
     if (ret != 0) {
         return ret;
@@ -288,8 +331,8 @@ int FormatData::update(std::string &key, std::string &value, bool is_delete) {
 
     // 2. update preposition node
     if (update_bucket) { // 2.1 update hash bucket node
-        bucket_node.next_index = ext_write_index;
-        ret = bucket_node.write_to(fs, line_index);
+        exist_bucket_node.next_index = ext_write_index;
+        ret = exist_bucket_node.write_to(fs, line_index);
     } else {             // 2.2 update hash data node
         ext_fnode.next_index = ext_write_index;
         ret = ext_fnode.write_to(ext_fs, current_index);
@@ -310,23 +353,76 @@ int FormatData::get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode) {
         LOG_ERROR("EXT FS not valid after read! which next_index:%d", next_index);
         return -1;
     }
-    return ext_fnode.deserialize(ext_node, line_size);
+    int ret = ext_fnode.deserialize(ext_node, line_size);
+    if (ret != 0) {
+        return RET_OF_FAIL; 
+    }
+    if (ext_fnode.is_deleted()) {
+        return RET_OF_DELETED; 
+    }
+    if (config.expire_seconds > 0 && time(NULL) > ext_fnode.expired_time) {
+        return RET_OF_DELETED; 
+    }
+    return 0;
+}
+
+int FormatData::del(std::string &key) {
+    if (key.size() > config.key_limit_size) {
+        LOG_ERROR("key SIZE REACH LIMIT which size:%d, limit:%d", key.size(), config.key_limit_size);
+        return -1;
+    }
+
+    uint32_t hash = get_key_hash(key);
+    uint32_t line_index = hash % config.hash_size;
+
+    FormatLine exist_bucket_node(config.key_limit_size, config.value_limit_size);
+    int ret = this->get_main_index(line_index, exist_bucket_node);
+    if (ret != 0) {
+        return ret;
+    }
+
+    if (exist_bucket_node.key_equal(key)) { // update
+        exist_bucket_node.status = FormatLine::IS_DELETE_NODE;
+        return exist_bucket_node.write_to(fs, line_index);
+    }
+
+    int32_t current_index = -1;
+    bool update_bucket = true;
+    FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
+
+    // FIND INSERT OR UPDATE POSTION
+    int32_t next_index = exist_bucket_node.next_index;
+    while (next_index != -1) {
+        int ret = get_next_ext_nodex(next_index, ext_fnode);
+        if (ret != 0) {
+            return ret;
+        }
+        if (ext_fnode.key_equal(key)) {
+            ext_fnode.status = FormatLine::IS_DELETE_NODE;
+            return ext_fnode.write_to(ext_fs, next_index);
+        }
+        update_bucket = false;
+        current_index = next_index;
+        next_index = ext_fnode.next_index;
+    }
+
+    return RET_OF_NOFOUND;
 }
 
 static inline std::string &ltrim(std::string &s) {
-        s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-        return s;
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+    return s;
 }
 
 // trim from end
 static inline std::string &rtrim(std::string &s) {
-        s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-        return s;
+    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
 }
 
 // trim from both ends
 static inline std::string &trim(std::string &s) {
-        return ltrim(rtrim(s));
+    return ltrim(rtrim(s));
 }
 
 int FormatData::get(std::string &key, std::string &value) {
@@ -337,35 +433,39 @@ int FormatData::get(std::string &key, std::string &value) {
     uint32_t line_index = hash % config.hash_size;
 
     LOG_DEBUG("GET FOR KEY:%s, hash:%u, line_index:%u", key.c_str(), hash, line_index);
-    int ret = this->get_by_index(line_index, format_line);
-    if (ret != 0) {
+    int ret = this->get_main_index(line_index, format_line);
+    if (ret == RET_OF_FAIL 
+        || ret == RET_OF_DELETED
+        || ret == RET_OF_EXPIRED 
+        || ret == RET_OF_NOFOUND) {
         return ret;
     }
 
-    if (format_line.key_equal(key)) {
+    if (ret == 0 && format_line.key_equal(key)) {
         value = trim(format_line.value);
         return 0;
     }
     int32_t next_index = format_line.next_index;
     FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
-    while(next_index != -1) {
+    while (next_index != -1) {
         int ret = get_next_ext_nodex(next_index, ext_fnode);
-        if (ret != 0) {
+        if (ret == RET_OF_FAIL) {
             return ret;
         }
         if (ext_fnode.key_equal(key)) {
+            if (ret == RET_OF_DELETED || ret == RET_OF_EXPIRED) {
+                return ret;
+            }
             value = trim(ext_fnode.value);
             return 0;
         }
         next_index = ext_fnode.next_index;
-
     }
 
-    return GET_RET_OF_NOFOUND;
+    return RET_OF_NOFOUND;
 }
 
-
-int FormatData::get_by_index(uint32_t &line_index, FormatLine &fline) {
+int FormatData::get_main_index(uint32_t &line_index, FormatLine &fline) {
     size_t line_size = fline.get_line_size();
     size_t offset = line_index * line_size;
     if (!fs) {
@@ -375,7 +475,7 @@ int FormatData::get_by_index(uint32_t &line_index, FormatLine &fline) {
     fs.seekg(offset, fs.beg);
     if (fs.eof()) {
         LOG_DEBUG("FS REACH EOF ON OFFSET:%u", offset);
-        return GET_RET_OF_NOFOUND;
+        return RET_OF_NOFOUND;
     }
     if (!fs || !fs.good()) {
         LOG_ERROR("FS not valid! after seekg offset:%u", offset);
@@ -390,19 +490,24 @@ int FormatData::get_by_index(uint32_t &line_index, FormatLine &fline) {
     }
     fs.seekg(0, fs.end);
 
-    LOG_DEBUG("READ LINE : %s FOR LINE INDE:%u, offset:%u", line, line_index, offset);
+    LOG_DEBUG("READ LINE : %s FOR LINE IDX:%u, offset:%u", 
+        std::string(line, line_size).c_str(), line_index, offset);
 
     int ret = fline.deserialize(line, line_size);
     if (ret != 0) {
         LOG_ERROR("FLINE deserialize fail for line:%s", line);
-        return ret;
+        return RET_OF_FAIL;
     }
     if (fline.is_empty()) {
-        return GET_RET_OF_NOFOUND;
+        return RET_OF_NOFOUND;
     }
-    if (fline.is_delete()) {
+    if (fline.is_deleted()) {
         LOG_DEBUG("fline is delete");
-        return GET_RET_OF_DELETED;
+        return RET_OF_DELETED;
+    }
+    if (config.expire_seconds > 0 && time(NULL) > fline.expired_time) {
+        LOG_DEBUG("fline is expired, now:%ld, expired_time:%ld", time(NULL), fline.expired_time);
+        return RET_OF_EXPIRED;
     }
 
     return 0;

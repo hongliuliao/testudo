@@ -14,7 +14,7 @@ int DataStorage::init(DataStorageConfig storage_config) {
 }
 
 int DataStorage::put(std::string &key, std::string &value) {
-    return this->format_data.update(key, value, false);
+    return this->format_data.update(key, value);
 }
 
 int DataStorage::get(std::string &key, std::string &value) {
@@ -22,6 +22,5 @@ int DataStorage::get(std::string &key, std::string &value) {
 }
 
 int DataStorage::del(std::string &key) {
-    std::string value;
-    return format_data.update(key, value, true);
+    return format_data.del(key);
 }
