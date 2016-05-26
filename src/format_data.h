@@ -12,6 +12,11 @@
 #include <map>
 #include <fstream>
 
+const static int RET_OF_FAIL = -1;
+const static int RET_OF_NOFOUND = -2;
+const static int RET_OF_DELETED = -3;
+const static int RET_OF_EXPIRED = -4;
+
 class FormatDataConfig {
 public:
     FormatDataConfig();
@@ -59,6 +64,8 @@ public:
     bool is_empty();
 
     bool key_equal(std::string &input);
+
+    std::string to_str();
 };
 
 class FormatData {
@@ -73,10 +80,6 @@ private:
 
     int get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode);
 public:
-    const static int RET_OF_FAIL = -1;
-    const static int RET_OF_NOFOUND = -2;
-    const static int RET_OF_DELETED = -3;
-    const static int RET_OF_EXPIRED = -4;
 
     ~FormatData();
 

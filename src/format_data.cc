@@ -31,10 +31,10 @@ FormatLine::FormatLine(int key_size, int value_size) {
 int FormatLine::deserialize(char *buffer, int size) {
     char tmp_status[2];
     bzero(tmp_status, 2);
-    char tmp_next_index[MAX_LINE_DIGIT];
-    bzero(tmp_next_index, MAX_LINE_DIGIT);
-    char tmp_expried_time[MAX_TIME_LEN];
-    bzero(tmp_expried_time, MAX_LINE_DIGIT);
+    char tmp_next_index[MAX_LINE_DIGIT + 1];
+    bzero(tmp_next_index, MAX_LINE_DIGIT + 1);
+    char tmp_expried_time[MAX_TIME_LEN + 1];
+    bzero(tmp_expried_time, MAX_LINE_DIGIT + 1);
 
     const char *p = buffer;
     _key.assign(p, _key_size);
@@ -51,6 +51,8 @@ int FormatLine::deserialize(char *buffer, int size) {
     status = atoi(tmp_status);
     next_index = atoi(tmp_next_index);
     expired_time = atoi(tmp_expried_time);
+    LOG_DEBUG("deserialize this:%s, input:%s"
+        , this->to_str().c_str(), buffer);
     return 0;
 }
 
@@ -71,6 +73,8 @@ int FormatLine::serialize(char *result, int size) {
         status_ss.str().c_str(), next_index_ss.str().c_str(),
         time_ss.str().c_str());
     //memcpy(result, line, size);
+    LOG_DEBUG("serialize this:%s, result:%s"
+        , this->to_str().c_str(), result);
     return 0;
 }
 
@@ -95,6 +99,16 @@ int FormatLine::get_line_size() {
 
 bool FormatLine::is_empty() {
     return status == IS_EMPTY_NODE;
+}
+
+std::string FormatLine::to_str() {
+    std::stringstream ss;
+    ss << "key:" << _key << ","
+       << "value:" << value << ","
+       << "status:" << status << "," 
+       << "next_index:" << next_index << "," 
+       << "expired_time:" << expired_time;
+    return ss.str();
 }
 
 // MurmurHash2 from redis (dict.c)
@@ -302,7 +316,17 @@ int FormatData::update(std::string &key, std::string &value) {
     while (next_index != -1) {
         int ret = get_next_ext_nodex(next_index, ext_fnode);
         if (ret == RET_OF_FAIL) {
+            LOG_INFO("get next ext node fail");
             return ret;
+        }
+        if (ret == RET_OF_DELETED || ret == RET_OF_EXPIRED) {
+            ext_fnode._key = key;
+            ext_fnode.value = value;
+            ext_fnode.status = 0;
+            if (config.expire_seconds > 0) {
+                ext_fnode.expired_time = expired_time;
+            }
+            return ext_fnode.write_to(ext_fs, next_index);
         }
         if (ext_fnode.key_equal(key)) {
             ext_fnode.value = value;
@@ -361,7 +385,7 @@ int FormatData::get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode) {
         return RET_OF_DELETED; 
     }
     if (config.expire_seconds > 0 && time(NULL) > ext_fnode.expired_time) {
-        return RET_OF_DELETED; 
+        return RET_OF_EXPIRED; 
     }
     return 0;
 }
