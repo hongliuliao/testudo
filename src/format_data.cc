@@ -195,7 +195,6 @@ FormatData::~FormatData() {
     }
 }
 
-
 int FormatData::init(FormatDataConfig &_config) {
     config = _config;
     std::string file_path = config.dir + config.file_name;
@@ -371,6 +370,7 @@ int FormatData::get_next_ext_nodex(int32_t next_index, FormatLine &ext_fnode) {
     size_t ext_offset = next_index * line_size;
     char ext_node[line_size];
     bzero(ext_node, line_size);
+   
     ext_fs.seekg(ext_offset);
     ext_fs.read(ext_node, line_size);
     if (!ext_fs) {
@@ -410,11 +410,8 @@ int FormatData::del(std::string &key) {
         return exist_bucket_node.write_to(fs, line_index);
     }
 
-    int32_t current_index = -1;
-    bool update_bucket = true;
-    FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
-
     // FIND INSERT OR UPDATE POSTION
+    FormatLine ext_fnode(config.key_limit_size, config.value_limit_size);
     int32_t next_index = exist_bucket_node.next_index;
     while (next_index != -1) {
         int ret = get_next_ext_nodex(next_index, ext_fnode);
@@ -425,8 +422,6 @@ int FormatData::del(std::string &key) {
             ext_fnode.status = FormatLine::IS_DELETE_NODE;
             return ext_fnode.write_to(ext_fs, next_index);
         }
-        update_bucket = false;
-        current_index = next_index;
         next_index = ext_fnode.next_index;
     }
 

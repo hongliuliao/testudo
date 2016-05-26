@@ -72,7 +72,6 @@ class FormatData {
 private:
     FormatDataConfig config;
     std::fstream fs;
-
     std::fstream ext_fs;
     int ext_write_index;
 

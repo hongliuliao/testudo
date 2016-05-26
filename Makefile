@@ -17,23 +17,23 @@ test: data_storage_test	format_data_test
 
 prepare: 
 	mkdir -p bin/include bin/lib
+
+%.o: %.cc
+	$(CXX) -c $(CXXFLAGS) $< -o $@
 	
-package:
+data_storage_test: package test/data_storage_test.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) test/data_storage_test.o $(TEST_DEPS_LIBS) -o bin/$@
+
+format_data_test: package test/format_data_test.o
+	$(CXX) $(CXXFLAGS) test/format_data_test.o $(TEST_DEPS_LIBS) -o bin/$@
+
+package: $(objects)
 	cp src/*.o bin/
 	ar -rcs libtestudo.a bin/*.o
 	
 	cp src/*.h bin/include/
 	mv libtestudo.a bin/lib/
 	rm -rf bin/*.o
-
-%.o: %.cc
-	$(CXX) -c $(CXXFLAGS) $< -o $@
-	
-data_storage_test: test/data_storage_test.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
-
-format_data_test: test/format_data_test.o
-	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
 
 tags:
 	ctags -R src
