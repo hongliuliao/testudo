@@ -1,13 +1,16 @@
-.PHONY : all test clean tags
+.PHONY : all test clean tags deps
 
 CXX=g++
-CXXFLAGS += -g -I. -I dependency/simple_log/include -I src
+CXXFLAGS += -g -I. -I deps/simple_log/output/include -I src
 
-TEST_DEPS_LIBS = bin/lib/libtestudo.a dependency/simple_log/lib/libsimplelog.a 
+TEST_DEPS_LIBS = bin/lib/libtestudo.a deps/simple_log/output/lib/libsimplelog.a 
 
 objects := $(patsubst %.cc,%.o,$(wildcard src/*.cc))
 
-all: prepare $(objects) package
+all: prepare deps $(objects) package
+
+deps:
+	make -C deps/simple_log
 	
 test: data_storage_test	format_data_test
 

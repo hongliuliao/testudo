@@ -9,7 +9,6 @@
 #include "simple_log.h"
 #include "format_data.h"
 
-
 int main() {
     FormatLine fline(15, 100);
     std::map<uint32_t, bool> key_map;

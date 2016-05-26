@@ -126,6 +126,7 @@ int test_expire() {
 
 
 int main() {
+    log_init("./conf", "simple_log.conf"); 
     //test_basic(); 
     test_perf();
     //test_expire();
