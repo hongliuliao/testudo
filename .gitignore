@@ -2,6 +2,9 @@
 .project
 bin
 Debug
+tags
+
+
 # Compiled Object files
 *.slo
 *.lo

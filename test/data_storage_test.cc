@@ -112,6 +112,7 @@ int test_expire() {
         LOG_ERROR("STORAGE INIT ERROR WHCH ret:%d", ret);
         return ret;
     }
+    
     std::string key = "aaa";
     std::string value = "bbb";
     storage.put(key, value);

@@ -1,7 +1,7 @@
+.PHONY : all test clean tags
+
 CXX=g++
 CXXFLAGS += -g -I. -I dependency/simple_log/include -I src
-
-.PHONY : all test clean tags
 
 TEST_DEPS_LIBS = bin/lib/libtestudo.a dependency/simple_log/lib/libsimplelog.a 
 
@@ -25,10 +25,10 @@ package:
 %.o: %.cc
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 	
-data_storage_test: test/data_storage_test.cc
+data_storage_test: test/data_storage_test.o
 	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
 
-format_data_test: test/format_data_test.cc
+format_data_test: test/format_data_test.o
 	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
 
 tags:
