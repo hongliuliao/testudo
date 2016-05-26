@@ -17,6 +17,7 @@ struct DataStorageConfig {
 class DataStorage {
 private:
     FormatData format_data;
+    pthread_rwlock_t rwlock;
 public:
     int init(DataStorageConfig storage_config);
 

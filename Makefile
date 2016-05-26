@@ -2,6 +2,7 @@
 
 CXX=g++
 CXXFLAGS += -g -I. -I deps/simple_log/output/include -I src
+LDFLAGS += -pthread
 
 TEST_DEPS_LIBS = bin/lib/libtestudo.a deps/simple_log/output/lib/libsimplelog.a 
 
@@ -29,7 +30,7 @@ package:
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 	
 data_storage_test: test/data_storage_test.o
-	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
 
 format_data_test: test/format_data_test.o
 	$(CXX) $(CXXFLAGS) $< $(TEST_DEPS_LIBS) -o bin/$@
@@ -39,6 +40,7 @@ tags:
 
 clean:
 	rm -rf src/*.o
+	rm -rf test/*.o
 	rm -rf bin/*
 
 	
